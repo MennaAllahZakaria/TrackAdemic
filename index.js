@@ -1,0 +1,57 @@
+const express = require("express");
+const dotenv = require("dotenv");
+const path = require("path");
+const ApiError = require("./utils/apiError");
+dotenv.config({ path: "config.env" });
+const morgan = require("morgan");
+const cors = require("cors");
+const compression = require("compression");
+const mountRoutes = require("./routes/index");
+const globalError = require("./middleware/errorMiddleware");
+const dbConnection = require("./config/database");
+// //Routes
+// // const mountRoutes = require("./routes");
+//connect with db
+dbConnection();
+
+// //express app
+const app = express();
+
+// Enable other domains to access your application
+app.use(cors());
+
+// compress all responses
+app.use(compression());
+
+//Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));// form-data 
+app.use(express.static(path.join(__dirname, "uploads"))); // /name photo => in localhost
+
+if (process.env.NODE_ENV == "development") {
+  app.use(morgan("dev"));
+  console.log(process.env.NODE_ENV);
+}
+
+
+
+//Mount Routes
+    mountRoutes(app);
+
+
+//Global error handling middleware for express
+app.use(globalError);
+
+const PORT = process.env.PORT || 8000;
+const server = app.listen(PORT, () => {
+  console.log(`App running on port ${PORT}`);
+});
+
+//handle rejection outside express
+process.on("unhandledRejection", (err) => {
+  console.error(`unhandledRejection: ${err.name} | ${err.message}`);
+  server.close(() => {
+    console.error(`Shutting down...`);
+    process.exit(1);
+  });
+});
