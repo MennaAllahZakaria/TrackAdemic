@@ -1,4 +1,5 @@
 const authRoute = require("./authRoute");
+const learningPathRoute = require("./learningPathRoute");
 
 const mountRoutes = (app) => {
     app.use((req, res, next) => {
@@ -28,6 +29,7 @@ const mountRoutes = (app) => {
 //=============================
 
 app.use("/auth", authRoute);
+app.use("/learning-path", learningPathRoute);
 
 //=============================
 // 404 Handler
