@@ -86,3 +86,19 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     updated_user_context: aiResponse.updated_user_context || null,
   });
 });
+
+exports.getChatHistory = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const messages = await ChatMessage.find({ user: userId })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+  res.status(200).json({
+    status: "success",
+    data: messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt,
+    })),
+  });
+});
