@@ -2,31 +2,88 @@ const asyncHandler = require("express-async-handler");
 const axios = require("axios");
 const LearningPath = require("../models/learningPathModel");
 
+const NodeCache = require("node-cache");
+const { z } = require("zod");
+
+
+/* ================= CACHE ================= */
+const cache = new NodeCache({ stdTTL: 60 * 60 }); // 1 hour
+
+/* ================= VALIDATION SCHEMAS ================= */
+
+const requestSchema = z.object({
+  goal: z.string().optional(),
+  field: z.string().min(2),
+  level: z.enum(["beginner", "intermediate", "advanced"]),
+  hours_per_day: z.number().min(0.5).max(12),
+  background: z.string().optional(),
+  language: z.string().optional(),
+  target_months: z.number().min(1).max(24).optional(),
+});
+
+const aiResponseSchema = z.object({
+  meta: z.object({
+    path_title: z.string(),
+    total_weeks: z.number(),
+  }),
+  phases: z.array(z.any()),
+  weekly_schedule: z.any(),
+  overall_milestones: z.array(z.string()),
+});
+
+/* ================= AXIOS INSTANCE ================= */
+
+const aiClient = axios.create({
+  baseURL: process.env.AI_BASE_URL,
+  timeout: 10000, // 10 sec
+});
+
+/* ================= HELPER ================= */
+
+const generateCacheKey = (body) => {
+  return JSON.stringify({
+    field: body.field,
+    level: body.level,
+    goal: body.goal,
+    hours: body.hours_per_day,
+  });
+};
+
+/* ================= CONTROLLER ================= */
 // @desc Generate Learning Path
 // @route POST /api/learning-path/generate
 // @access Private
+
 exports.generateLearningPath = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  const {
-    goal,
-    field,
-    level,
-    hours_per_day,
-    background,
-    language,
-    target_months,
-  } = req.body;
+  /* ================= VALIDATE INPUT ================= */
 
-  /* ================= VALIDATION ================= */
+  const parsed = requestSchema.safeParse(req.body);
 
-  if (!field || !level) {
+  if (!parsed.success) {
     return res.status(400).json({
-      message: "field and level are required",
+      message: "Invalid input",
+      errors: parsed.error.errors,
     });
   }
 
-  /* ================= CHECK EXISTING ================= */
+  const body = parsed.data;
+
+  /* ================= RATE LIMIT (simple) ================= */
+
+  const recent = await LearningPath.findOne({
+    user: userId,
+    createdAt: { $gt: new Date(Date.now() - 60 * 1000) },
+  });
+
+  if (recent) {
+    return res.status(429).json({
+      message: "Too many requests, try again later",
+    });
+  }
+
+  /* ================= CHECK ACTIVE ================= */
 
   const existingPath = await LearningPath.findOne({
     user: userId,
@@ -35,57 +92,61 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
 
   if (existingPath) {
     return res.status(400).json({
-      message: "You already have an active learning path",
+      message: "Active learning path already exists",
     });
   }
 
-  /* ================= CALL AI ================= */
+  /* ================= CACHE ================= */
 
-  const aiResponse = await axios.post(
-    process.env.AI_BASE_URL + "/ai/learning-path",
-    {
-      goal,
-      field,
-      level,
-      background,
-      hours_per_day,
-      language,
-      target_months,
-    }
-  );
-
-  const aiData = aiResponse.data?.data;
+  const cacheKey = generateCacheKey(body);
+  let aiData = cache.get(cacheKey);
 
   if (!aiData) {
-    return res.status(500).json({
-      message: "AI failed to generate learning path",
-    });
+    try {
+      const aiResponse = await aiClient.post("/ai/learning-path", body);
+
+      const raw = aiResponse.data?.data;
+
+      const validated = aiResponseSchema.safeParse(raw);
+
+      if (!validated.success) {
+        return res.status(500).json({
+          message: "Invalid AI response structure",
+        });
+      }
+
+      aiData = validated.data;
+
+      cache.set(cacheKey, aiData);
+    } catch (error) {
+      return res.status(500).json({
+        message: "AI service failed",
+        error: error.message,
+      });
+    }
   }
 
-  /* ================= MAP DATA ================= */
+  /* ================= SAVE ================= */
 
   const learningPath = await LearningPath.create({
     user: userId,
 
-    pathTitle: aiData.meta?.path_title,
-    totalWeeks: aiData.meta?.total_weeks,
+    pathTitle: aiData.meta.path_title,
+    totalWeeks: aiData.meta.total_weeks,
 
-    phases: aiData.phases || [],
-
-    weeklySchedule: aiData.weekly_schedule || {},
-    milestones: aiData.overall_milestones || [],
+    phases: aiData.phases,
+    weeklySchedule: aiData.weekly_schedule,
+    milestones: aiData.overall_milestones,
 
     generatedFrom: {
-      field,
-      level,
-      goal,
-      hoursPerDay: hours_per_day,
+      field: body.field,
+      level: body.level,
+      goal: body.goal,
+      hoursPerDay: body.hours_per_day,
     },
 
     isActive: true,
   });
-
-  /* ================= RESPONSE ================= */
 
   res.status(201).json({
     status: "success",
