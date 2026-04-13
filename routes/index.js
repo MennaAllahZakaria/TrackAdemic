@@ -3,6 +3,7 @@ const learningPathRoute = require("./learningPathRoute");
 const chatMessageRoute = require("./chatMessageRoute");
 const progressRoute = require("./progressRoute");
 const quizRoute = require("./quizRoute");
+const assessmentRoute = require("./assessmentRoute");
 
 const mountRoutes = (app) => {
     app.use((req, res, next) => {
@@ -36,6 +37,7 @@ app.use("/learning-path", learningPathRoute);
 app.use("/chat", chatMessageRoute);
 app.use("/progress", progressRoute);
 app.use("/quiz", quizRoute);
+app.use("/assessment", assessmentRoute);
 
 //=============================
 // 404 Handler
