@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const axios = require("axios");
 const LearningPath = require("../models/learningPathModel");
+const UserContext = require("../models/userContextModel");
 
 const NodeCache = require("node-cache");
 const { z } = require("zod");
@@ -147,6 +148,33 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
 
     isActive: true,
   });
+
+  /* ================= UPDATE USER CONTEXT ================= */
+
+  const userContext = await UserContext.findOne({ user: userId });
+
+  if (userContext) {
+    userContext.pathTitle = aiData.meta.path_title;
+    userContext.totalPhases = aiData.phases.length;
+
+    userContext.currentPhaseNumber = 1;
+    userContext.currentPhaseTitle = aiData.phases[0]?.title || "";
+
+    userContext.currentCourseTitle =
+      aiData.phases[0]?.resources?.[0]?.title || "";
+
+    userContext.currentCourseUrl =
+      aiData.phases[0]?.resources?.[0]?.url || "";
+
+    userContext.stage = "learning";
+    userContext.lastActivity = new Date();
+    
+    userContext.completedPhases = [];
+    userContext.completedTopics = [];
+    userContext.overallProgressPercent = 0;
+
+    await userContext.save();
+  }
 
   res.status(201).json({
     status: "success",
