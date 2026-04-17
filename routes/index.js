@@ -4,6 +4,7 @@ const chatMessageRoute = require("./chatMessageRoute");
 const progressRoute = require("./progressRoute");
 const quizRoute = require("./quizRoute");
 const assessmentRoute = require("./assessmentRoute");
+const userContextRoute = require("./userContextRoute");
 
 const mountRoutes = (app) => {
     app.use((req, res, next) => {
@@ -38,6 +39,7 @@ app.use("/chat", chatMessageRoute);
 app.use("/progress", progressRoute);
 app.use("/quiz", quizRoute);
 app.use("/assessment", assessmentRoute);
+app.use("/user-context", userContextRoute);
 
 //=============================
 // 404 Handler
