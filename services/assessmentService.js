@@ -3,13 +3,32 @@ const axios = require("axios");
 const AssessmentSession = require("../models/assessmentSessionModel");
 const Progress = require("../models/progressModel");
 
+const UserContext = require("../models/userContextModel");
+
 exports.startAssessment = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { field, goal, user_context } = req.body;
+  const { field, goal } = req.body;
 
-  if (!field || !user_context) {
+  /* ================= GET USER CONTEXT ================= */
+
+  const userContext = await UserContext.findOne({ user: userId });
+
+  if (!userContext) {
     return res.status(400).json({
-      message: "field and user_context required",
+      message: "User context not found",
+    });
+  }
+
+  /* ================= PREVENT MULTIPLE SESSIONS ================= */
+
+  const existing = await AssessmentSession.findOne({
+    user: userId,
+    isCompleted: false,
+  });
+
+  if (existing) {
+    return res.status(400).json({
+      message: "Finish current assessment first",
     });
   }
 
@@ -21,9 +40,9 @@ exports.startAssessment = asyncHandler(async (req, res) => {
     const response = await axios.post(
       process.env.AI_BASE_URL + "/assessment/start",
       {
-        field,
-        goal,
-        user_context,
+        field: field || userContext.field,
+        goal: goal || userContext.goal,
+        user_context: userContext.toObject(),
       },
       { timeout: 8000 }
     );
@@ -43,6 +62,12 @@ exports.startAssessment = asyncHandler(async (req, res) => {
     currentQuestion: aiData.question_number,
     totalQuestions: aiData.total_questions,
   });
+
+  /* ================= UPDATE CONTEXT ================= */
+
+  userContext.stage = "assessment";
+  userContext.lastActivity = new Date();
+  await userContext.save();
 
   res.status(200).json({
     status: "success",
@@ -105,7 +130,7 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
     answer,
   });
 
-  /* ================= CHECK END ================= */
+  /* ================= END ASSESSMENT ================= */
 
   if (!aiData.question) {
     session.isCompleted = true;
@@ -120,6 +145,20 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
     };
 
     await session.save();
+
+    /* ================= UPDATE USER CONTEXT ================= */
+
+    const userContext = await UserContext.findOne({ user: userId });
+
+    if (userContext) {
+      userContext.level = updatedContext.level;
+      userContext.strongTopics = updatedContext.strong_topics || [];
+      userContext.weakTopics = updatedContext.weak_topics || [];
+      userContext.stage = "onboarding";
+      userContext.lastActivity = new Date();
+
+      await userContext.save();
+    }
 
     /* ================= UPDATE PROGRESS ================= */
 
@@ -148,7 +187,6 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
     return res.status(200).json({
       status: "completed",
       result: session.result,
-      updated_user_context: updatedContext,
     });
   }
 
