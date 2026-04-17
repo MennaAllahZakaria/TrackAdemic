@@ -3,6 +3,8 @@ const axios = require("axios");
 const QuizAttempt = require("../models/quizModel");
 const Progress = require("../models/progressModel");
 const LearningPath = require("../models/learningPathModel");
+const UserContext = require("../models/userContextModel");
+const normalize = (str) => str.toLowerCase().trim();
 
 
 exports.generateQuiz = asyncHandler(async (req, res) => {
@@ -53,9 +55,9 @@ exports.submitQuiz = asyncHandler(async (req, res) => {
 
   const { answers, questions, topic } = req.body;
 
-  if (!answers || !questions) {
+  if (!answers || !questions || !topic) {
     return res.status(400).json({
-      message: "answers and questions required",
+      message: "answers, questions and topic required",
     });
   }
 
@@ -92,15 +94,19 @@ exports.submitQuiz = asyncHandler(async (req, res) => {
     results,
   });
 
-  /* ================= UPDATE PROGRESS ================= */
+  /* ================= GET LEARNING PATH ================= */
 
   const learningPath = await LearningPath.findOne({
     user: userId,
     isActive: true,
   });
 
+  /* ================= UPDATE PROGRESS ================= */
+
+  let progress;
+
   if (learningPath) {
-    let progress = await Progress.findOne({
+    progress = await Progress.findOne({
       user: userId,
       learningPath: learningPath._id,
     });
@@ -109,20 +115,66 @@ exports.submitQuiz = asyncHandler(async (req, res) => {
       progress = await Progress.create({
         user: userId,
         learningPath: learningPath._id,
+        completedTopics: [],
+        strongTopics: [],
+        weakTopics: [],
       });
     }
 
+    const topicNormalized = normalize(topic);
+
+    /* weak / strong */
+
     if (percentage < 50) {
-      if (!progress.weakTopics.includes(topic)) {
+      if (
+        !progress.weakTopics.map(normalize).includes(topicNormalized)
+      ) {
         progress.weakTopics.push(topic);
       }
     } else {
-      if (!progress.strongTopics.includes(topic)) {
+      if (
+        !progress.strongTopics.map(normalize).includes(topicNormalized)
+      ) {
         progress.strongTopics.push(topic);
+      }
+
+      /* ================= MARK TOPIC COMPLETED ================= */
+      if (
+        !progress.completedTopics
+          .map(normalize)
+          .includes(topicNormalized)
+      ) {
+        progress.completedTopics.push(topic);
       }
     }
 
     await progress.save();
+  }
+
+  /* ================= UPDATE USER CONTEXT ================= */
+
+  const userContext = await UserContext.findOne({ user: userId });
+
+  if (userContext) {
+    /* quiz scores */
+    userContext.quizScores.push(percentage);
+
+    const avg =
+      userContext.quizScores.reduce((a, b) => a + b, 0) /
+      userContext.quizScores.length;
+
+    userContext.averageQuizScore = avg;
+
+    /* sync topics */
+    if (progress) {
+      userContext.strongTopics = progress.strongTopics;
+      userContext.weakTopics = progress.weakTopics;
+      userContext.completedTopics = progress.completedTopics;
+    }
+
+    userContext.lastActivity = new Date();
+
+    await userContext.save();
   }
 
   /* ================= RESPONSE ================= */
