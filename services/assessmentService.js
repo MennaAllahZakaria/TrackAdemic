@@ -49,9 +49,14 @@ exports.startAssessment = asyncHandler(async (req, res) => {
 
     aiData = response.data;
   } catch (err) {
-    return res.status(500).json({
-      message: "AI failed to start assessment",
-    });
+    const aiError = err.response?.data;
+
+      console.error("AI ERROR:", aiError || err.message);
+
+      return res.status(503).json({
+        message: "AI service temporarily unavailable",
+        ai_error: aiError || null,
+      });
   }
 
   /* ================= SAVE SESSION ================= */
@@ -118,9 +123,14 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
 
     aiData = response.data;
   } catch (err) {
-    return res.status(500).json({
-      message: "AI failed",
-    });
+    const aiError = err.response?.data;
+
+      console.error("AI ERROR:", aiError || err.message);
+
+      return res.status(503).json({
+        message: "AI service temporarily unavailable",
+        ai_error: aiError || null,
+      });
   }
 
   /* ================= SAVE ANSWER ================= */

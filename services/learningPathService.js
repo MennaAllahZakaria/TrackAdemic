@@ -120,9 +120,13 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
 
       cache.set(cacheKey, aiData);
     } catch (error) {
-      return res.status(500).json({
-        message: "AI service failed",
-        error: error.message,
+      const aiError = err.response?.data;
+
+      console.error("AI ERROR:", aiError || err.message);
+
+      return res.status(503).json({
+        message: "AI service temporarily unavailable",
+        ai_error: aiError || null,
       });
     }
   }
@@ -168,7 +172,7 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
 
     userContext.stage = "learning";
     userContext.lastActivity = new Date();
-    
+
     userContext.completedPhases = [];
     userContext.completedTopics = [];
     userContext.overallProgressPercent = 0;
@@ -234,6 +238,7 @@ exports.regenerateLearningPath = asyncHandler(async (req, res) => {
 
   /* ================= CALL AI ================= */
 
+  try {
   const aiResponse = await axios.post(
     process.env.AI_BASE_URL + "/ai/learning-path",
     {
@@ -269,4 +274,16 @@ exports.regenerateLearningPath = asyncHandler(async (req, res) => {
     status: "success",
     data: newPath,
   });
+
+} catch (err) {
+      const aiError = err.response?.data;
+
+      console.error("AI ERROR:", aiError || err.message);
+
+      return res.status(503).json({
+        message: "AI service temporarily unavailable",
+        ai_error: aiError || null,
+      });
+    }
+
 });
