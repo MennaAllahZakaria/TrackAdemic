@@ -1,6 +1,11 @@
 const asyncHandler = require("express-async-handler");
 const Progress = require("../models/progressModel");
 const LearningPath = require("../models/learningPathModel");
+const UserContext = require("../models/userContextModel");
+
+/* ================= HELPERS ================= */
+
+const normalize = (str) => str.toLowerCase().trim();
 
 exports.updateProgress = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -13,7 +18,7 @@ exports.updateProgress = asyncHandler(async (req, res) => {
     });
   }
 
-  /* ================= GET PATH ================= */
+  /* ================= GET LEARNING PATH ================= */
 
   const learningPath = await LearningPath.findOne({
     user: userId,
@@ -37,6 +42,9 @@ exports.updateProgress = asyncHandler(async (req, res) => {
     progress = await Progress.create({
       user: userId,
       learningPath: learningPath._id,
+      completedTopics: [],
+      strongTopics: [],
+      weakTopics: [],
     });
   }
 
@@ -50,25 +58,91 @@ exports.updateProgress = asyncHandler(async (req, res) => {
 
   /* ================= UPDATE TOPICS ================= */
 
-  if (topic && !progress.completedTopics.includes(topic)) {
-    progress.completedTopics.push(topic);
+  if (topic) {
+    const exists = progress.completedTopics
+      .map(normalize)
+      .includes(normalize(topic));
+
+    if (!exists) {
+      progress.completedTopics.push(topic);
+    }
   }
 
   /* ================= CALCULATE PROGRESS ================= */
 
+  const phases = learningPath.phases || [];
+
   const totalTopics =
-    learningPath.phases.reduce((acc, phase) => {
-      return acc + (phase.topics?.length || 0);
-    }, 0) || 1;
+    phases.reduce(
+      (acc, phase) => acc + (phase.topics?.length || 0),
+      0
+    ) || 1;
 
   progress.overallProgress =
     (progress.completedTopics.length / totalTopics) * 100;
 
+  /* ================= DETERMINE CURRENT PHASE ================= */
+
+  let completedCount = progress.completedTopics.length;
+  let accumulated = 0;
+  let currentPhaseIndex = 0;
+
+  for (let i = 0; i < phases.length; i++) {
+    const phaseTopics = phases[i].topics?.length || 0;
+    accumulated += phaseTopics;
+
+    if (completedCount <= accumulated) {
+      currentPhaseIndex = i;
+      break;
+    }
+  }
+
+  /* ================= UPDATE USER CONTEXT ================= */
+
+  const userContext = await UserContext.findOne({ user: userId });
+
+  if (userContext) {
+    const currentPhase = phases[currentPhaseIndex] || {};
+    const firstResource = currentPhase.resources?.[0] || {};
+
+    userContext.currentPhaseNumber = currentPhaseIndex + 1;
+    userContext.currentPhaseTitle = currentPhase.title || "";
+
+    userContext.currentCourseTitle = firstResource.title || "";
+    userContext.currentCourseUrl = firstResource.url || "";
+
+    userContext.completedTopics = progress.completedTopics;
+    userContext.overallProgressPercent = progress.overallProgress;
+
+    userContext.totalHoursStudied = progress.totalHoursStudied;
+    userContext.hoursStudiedThisWeek = progress.hoursThisWeek;
+
+    /* ================= PHASE COMPLETION ================= */
+
+    if (
+      progress.completedTopics.length >= accumulated &&
+      !userContext.completedPhases.includes(currentPhaseIndex)
+    ) {
+      userContext.completedPhases.push(currentPhaseIndex);
+    }
+
+    userContext.lastActivity = new Date();
+
+    await userContext.save();
+  }
+
+  /* ================= SAVE ================= */
+
   await progress.save();
+
+  /* ================= RESPONSE ================= */
 
   res.status(200).json({
     status: "success",
-    data: progress,
+    data: {
+      progress,
+      currentPhase: currentPhaseIndex + 1,
+    },
   });
 });
 
