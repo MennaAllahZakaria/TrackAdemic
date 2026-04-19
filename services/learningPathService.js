@@ -58,8 +58,6 @@ const generateCacheKey = (body) => {
 exports.generateLearningPath = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  /* ================= VALIDATE INPUT ================= */
-
   const parsed = requestSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -70,8 +68,6 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
   }
 
   const body = parsed.data;
-
-  /* ================= RATE LIMIT (simple) ================= */
 
   const recent = await LearningPath.findOne({
     user: userId,
@@ -84,8 +80,6 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
     });
   }
 
-  /* ================= CHECK ACTIVE ================= */
-
   const existingPath = await LearningPath.findOne({
     user: userId,
     isActive: true,
@@ -97,8 +91,6 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
     });
   }
 
-  /* ================= CACHE ================= */
-
   const cacheKey = generateCacheKey(body);
   let aiData = cache.get(cacheKey);
 
@@ -107,7 +99,6 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
       const aiResponse = await aiClient.post("/ai/learning-path", body);
 
       const raw = aiResponse.data?.data;
-
       const validated = aiResponseSchema.safeParse(raw);
 
       if (!validated.success) {
@@ -117,12 +108,20 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
       }
 
       aiData = validated.data;
-
       cache.set(cacheKey, aiData);
-    } catch (error) {
+    } catch (err) {
+      const status = err.response?.status;
       const aiError = err.response?.data;
 
       console.error("AI ERROR:", aiError || err.message);
+
+      if (status === 429) {
+        return res.status(200).json({
+          status: "quota_exceeded",
+          message: "AI quota exceeded, please try again later",
+          ai_error: aiError || null,
+        });
+      }
 
       return res.status(503).json({
         message: "AI service temporarily unavailable",
@@ -131,50 +130,44 @@ exports.generateLearningPath = asyncHandler(async (req, res) => {
     }
   }
 
-  /* ================= SAVE ================= */
-
   const learningPath = await LearningPath.create({
     user: userId,
-
     pathTitle: aiData.meta.path_title,
     totalWeeks: aiData.meta.total_weeks,
-
     phases: aiData.phases,
     weeklySchedule: aiData.weekly_schedule,
     milestones: aiData.overall_milestones,
-
     generatedFrom: {
       field: body.field,
       level: body.level,
       goal: body.goal,
       hoursPerDay: body.hours_per_day,
     },
-
     isActive: true,
   });
-
-  /* ================= UPDATE USER CONTEXT ================= */
 
   const userContext = await UserContext.findOne({ user: userId });
 
   if (userContext) {
+    const firstPhase = aiData.phases?.[0] || {};
+    const firstResource = firstPhase.resources?.[0] || {};
+
     userContext.pathTitle = aiData.meta.path_title;
-    userContext.totalPhases = aiData.phases.length;
+    userContext.totalPhases = aiData.phases?.length || 0;
 
-    userContext.currentPhaseNumber = 1;
-    userContext.currentPhaseTitle = aiData.phases[0]?.title || "";
+    userContext.currentPhaseNumber = aiData.phases?.length ? 1 : 0;
+    userContext.currentPhaseTitle = firstPhase.title || "";
 
-    userContext.currentCourseTitle =
-      aiData.phases[0]?.resources?.[0]?.title || "";
-
-    userContext.currentCourseUrl =
-      aiData.phases[0]?.resources?.[0]?.url || "";
+    userContext.currentCourseTitle = firstResource.title || "";
+    userContext.currentCourseUrl = firstResource.url || "";
 
     userContext.stage = "learning";
     userContext.lastActivity = new Date();
 
     userContext.completedPhases = [];
     userContext.completedTopics = [];
+    userContext.remainingTopics =
+      aiData.phases?.flatMap((phase) => phase.topics || []) || [];
     userContext.overallProgressPercent = 0;
 
     await userContext.save();
