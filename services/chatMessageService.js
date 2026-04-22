@@ -109,10 +109,10 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         user_context: formattedContext,
         chat_history: chatHistory,
       },
-      { timeout: 8000 }
     );
 
     aiResponse = response.data?.data;
+    //console.log("AI RESPONSE:", aiResponse);
   } catch (err) {
       const aiError = err.response?.data;
 
@@ -166,6 +166,12 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
       if (weak && !progress.weakTopics.includes(topic)) {
         progress.weakTopics.push(topic);
+        userContext.weakTopics = progress.weakTopics;
+        await userContext.save();
+      } else if (!weak && !progress.strongTopics.includes(topic)) {
+        progress.strongTopics.push(topic);
+        userContext.strongTopics = progress.strongTopics;
+        await userContext.save();
       }
 
       await progress.save();

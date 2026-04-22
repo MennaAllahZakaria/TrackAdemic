@@ -44,7 +44,6 @@ exports.startAssessment = asyncHandler(async (req, res) => {
         goal: goal || userContext.goal,
         user_context: userContext.toObject(),
       },
-      { timeout: 8000 }
     );
 
     aiData = response.data;
@@ -118,7 +117,6 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
         session_id: sessionId,
         answer,
       },
-      { timeout: 8000 }
     );
 
     aiData = response.data;

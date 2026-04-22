@@ -27,7 +27,6 @@ exports.generateQuiz = asyncHandler(async (req, res) => {
         num_questions,
         course_title,
       },
-      { timeout: 8000 }
     );
 
     aiData = response.data?.data;
