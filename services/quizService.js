@@ -4,8 +4,8 @@ const QuizAttempt = require("../models/quizModel");
 const Progress = require("../models/progressModel");
 const LearningPath = require("../models/learningPathModel");
 const UserContext = require("../models/userContextModel");
+const Quiz = require("../models/questionModel");
 const normalize = (str) => str.toLowerCase().trim();
-
 
 exports.generateQuiz = asyncHandler(async (req, res) => {
   const { topic, level, num_questions, course_title } = req.body;
@@ -42,50 +42,87 @@ exports.generateQuiz = asyncHandler(async (req, res) => {
     });
   }
 
+  /* ================= SAVE QUIZ ================= */
+
+  const quiz = await Quiz.create({
+    user: req.user._id,
+    topic: aiData.topic,
+    level: aiData.level,
+    questions: aiData.questions,
+    passing_score: aiData.passing_score,
+    practical_task: {
+      title: aiData.practical_task.title,
+      description: aiData.practical_task.description,
+      expected_output: aiData.practical_task.expected_output,
+      estimated_minutes: aiData.practical_task.estimated_minutes,
+      evaluation_criteria: aiData.practical_task.evaluation_criteria,
+    }
+  });
+
   res.status(200).json({
     status: "success",
+    quizId: quiz._id,
     data: aiData,
   });
 });
 
-
 exports.submitQuiz = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+  const { answers, quizId } = req.body;
 
-  const { answers, questions, topic } = req.body;
-
-  if (!answers || !questions || !topic) {
+  if (!answers || !quizId) {
     return res.status(400).json({
-      message: "answers, questions and topic required",
+      message: "answers and quizId required",
+    });
+  }
+
+  const quiz = await Quiz.findOne({
+    _id: quizId,
+    user: userId,
+  });
+
+  if (!quiz) {
+    return res.status(404).json({
+      message: "Quiz not found",
+    });
+  }
+
+  if (quiz.isSubmitted) {
+    return res.status(400).json({
+      message: "Quiz already submitted",
     });
   }
 
   let score = 0;
   const results = [];
 
-  /* ================= EVALUATE ================= */
-
-  questions.forEach((q) => {
+  quiz.questions.forEach((q) => {
     const userAnswer = answers[q.id];
     const isCorrect = userAnswer === q.correct_answer;
+    const CorrectAnswer = q.correct_answer;
+    const Explanation = q.explanation; 
 
     if (isCorrect) score++;
 
     results.push({
       question: q.question,
       correct: isCorrect,
-      topic,
+      topic: quiz.topic,
+      userAnswer,
+      CorrectAnswer,
+      Explanation,
     });
   });
 
-  const total = questions.length;
+  const total = quiz.questions.length;
   const percentage = (score / total) * 100;
 
-  /* ================= SAVE ATTEMPT ================= */
+  quiz.isSubmitted = true;
+  await quiz.save();
 
   await QuizAttempt.create({
     user: userId,
-    topic,
+    topic: quiz.topic,
     score,
     total,
     percentage,
@@ -93,96 +130,90 @@ exports.submitQuiz = asyncHandler(async (req, res) => {
     results,
   });
 
-  /* ================= GET LEARNING PATH ================= */
-
-  const learningPath = await LearningPath.findOne({
-    user: userId,
-    isActive: true,
-  });
-
-  /* ================= UPDATE PROGRESS ================= */
-
-  let progress;
-
-  if (learningPath) {
-    progress = await Progress.findOne({
-      user: userId,
-      learningPath: learningPath._id,
-    });
-
-    if (!progress) {
-      progress = await Progress.create({
-        user: userId,
-        learningPath: learningPath._id,
-        completedTopics: [],
-        strongTopics: [],
-        weakTopics: [],
-      });
-    }
-
-    const topicNormalized = normalize(topic);
-
-    /* weak / strong */
-
-    if (percentage < 50) {
-      if (
-        !progress.weakTopics.map(normalize).includes(topicNormalized)
-      ) {
-        progress.weakTopics.push(topic);
-      }
-    } else {
-      if (
-        !progress.strongTopics.map(normalize).includes(topicNormalized)
-      ) {
-        progress.strongTopics.push(topic);
-      }
-
-      /* ================= MARK TOPIC COMPLETED ================= */
-      if (
-        !progress.completedTopics
-          .map(normalize)
-          .includes(topicNormalized)
-      ) {
-        progress.completedTopics.push(topic);
-      }
-    }
-
-    await progress.save();
-  }
-
-  /* ================= UPDATE USER CONTEXT ================= */
-
-  const userContext = await UserContext.findOne({ user: userId });
-
-  if (userContext) {
-    /* quiz scores */
-    userContext.quizScores.push(percentage);
-
-    const avg =
-      userContext.quizScores.reduce((a, b) => a + b, 0) /
-      userContext.quizScores.length;
-
-    userContext.averageQuizScore = avg;
-
-    /* sync topics */
-    if (progress) {
-      userContext.strongTopics = progress.strongTopics;
-      userContext.weakTopics = progress.weakTopics;
-      userContext.completedTopics = progress.completedTopics;
-    }
-
-    userContext.lastActivity = new Date();
-
-    await userContext.save();
-  }
-
-  /* ================= RESPONSE ================= */
-
   res.status(200).json({
     status: "success",
     score,
     total,
     percentage,
     results,
+  });
+});
+
+exports.getMyQuizzes = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const quizzes = await Quiz.find({ user: userId })
+    .select("topic level isSubmitted createdAt passing_score")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    status: "success",
+    results: quizzes.length,
+    data: quizzes,
+  });
+});
+
+exports.getQuizById = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { id } = req.params;
+
+  const quiz = await Quiz.findOne({
+    _id: id,
+    user: userId,
+  });
+
+  if (!quiz) {
+    return res.status(404).json({
+      message: "Quiz not found",
+    });
+  }
+
+  // If quiz is not submitted, don't send correct answers and explanations
+  if (!quiz.isSubmitted) {
+    const questions = quiz.questions.map((q) => ({
+      id: q.id,
+      question: q.question,
+      options: q.options,
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        ...quiz.toObject(),
+        questions,
+      },
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: quiz,
+  });
+});
+
+exports.getAllQuizzes = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, topic, submitted } = req.query;
+
+  const filter = {};
+
+  if (topic) filter.topic = topic;
+  if (submitted !== undefined) {
+    filter.isSubmitted = submitted === "true";
+  }
+
+  const quizzes = await Quiz.find(filter)
+    .populate("user", "firstName lastName email")
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .sort({ createdAt: -1 });
+
+  const total = await Quiz.countDocuments(filter);
+
+  res.status(200).json({
+    status: "success",
+    page: Number(page),
+    total,
+    results: quizzes.length,
+    data: quizzes,
   });
 });
