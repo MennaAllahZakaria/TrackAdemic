@@ -10,7 +10,8 @@ const {
     updateFcmToken,
     changePassword,
     getLoggedInUser,
-    updateImageProfile
+    //updateImageProfile,
+    googleLogin
 } = require("../services/authService");
 
 const {
@@ -64,4 +65,7 @@ router.get("/me",protect,getLoggedInUser);
 
 //================== UPDATE IMAGE PROFILE ===================
 //router.patch("/updateImageProfile", protect, uploadImages, attachUploadedLinks, updateImageProfile);
+
+//================== GOOGLE LOGIN ===================
+router.post("/google-login", googleLogin);
 module.exports = router;

@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, "password required"],
+        //required: [true, "password required"],
         minlength: [8, "too short password"],
     },
 
@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema({
     fcmToken: {
         type: String,
         default: null,
+    },
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true,
     },
 
 },{

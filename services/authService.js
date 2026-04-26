@@ -7,6 +7,8 @@ const sendEmail = require("../utils/sendEmail");
 const ApiError = require("../utils/apiError");
 const createToken = require("../utils/createToken"); // JWT
 const { encryptToken } = require("../utils/fcmToken");
+const { OAuth2Client } = require("google-auth-library");
+const jwt = require("jsonwebtoken");
 
 // ==================== Helpers ====================
 
@@ -463,6 +465,65 @@ exports.getLoggedInUser = asyncHandler(async (req, res) => {
     }
   });
   
+});
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+exports.googleLogin = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({
+      message: "Google token is required",
+    });
+  }
+
+  /* ================= VERIFY TOKEN ================= */
+
+  const ticket = await client.verifyIdToken({
+    idToken: token,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+
+  const {
+    sub: googleId,
+    email,
+    given_name,
+    family_name,
+    picture,
+  } = payload;
+
+
+  /* ================= FIND OR CREATE USER ================= */
+
+  let user = await User.findOne({ email });
+
+  if (user && !user.googleId) {
+      user.googleId = googleId;
+      await user.save();
+    }
+
+  if (!user) {
+    user = await User.create({
+      firstName: given_name,
+      lastName: family_name,
+      email,
+      googleId,
+      imageProfile: picture,
+    });
+  }
+
+  /* ================= GENERATE JWT ================= */
+
+  const userToken = createToken(user._id);
+
+  res.status(200).json({
+    status: "success",
+    token: userToken,
+    data: user,
+  });
 });
 
 // exports.updateImageProfile = asyncHandler(async (req, res, next) => {
