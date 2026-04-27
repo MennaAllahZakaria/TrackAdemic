@@ -8,16 +8,15 @@ exports.upsertUserContext = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
   const {
-    name,
     goal,
     field,
     level,
     hours_per_day,
   } = req.body;
 
-  if (!name || !field || !level) {
+  if (!field || !level) {
     return res.status(400).json({
-      message: "name, field and level are required",
+      message: "field and level are required",
     });
   }
 
@@ -30,7 +29,7 @@ exports.upsertUserContext = asyncHandler(async (req, res) => {
 
     userContext = await UserContext.create({
       user: userId,
-      name,
+      name: `${req.user.firstName} ${req.user.lastName}`,
       goal,
       field,
       level,
@@ -42,7 +41,6 @@ exports.upsertUserContext = asyncHandler(async (req, res) => {
   } else {
     /* ================= UPDATE ================= */
 
-    userContext.name = name || userContext.name;
     userContext.goal = goal || userContext.goal;
     userContext.field = field || userContext.field;
     userContext.level = level || userContext.level;
