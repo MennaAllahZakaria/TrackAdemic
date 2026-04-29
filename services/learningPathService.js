@@ -73,6 +73,14 @@ const normalizeLearningPath = (aiData) => {
           platform: course.platform,
           estimated_hours: course.estimated_hours || 0,
         })),
+        project: phase.project
+          ? {
+              title: phase.project.title,
+              description: phase.project.description,
+              deliverable: phase.project.deliverable,
+              estimated_hours: phase.project.estimated_hours || 0,
+            }
+          : null,
     })),
 
     weeklySchedule: aiData.weekly_schedule || {},
