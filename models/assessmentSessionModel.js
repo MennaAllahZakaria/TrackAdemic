@@ -15,6 +15,14 @@ const assessmentSessionSchema = new mongoose.Schema(
     answers: [
       {
         questionId: Number,
+        questionText: String,
+        options: [
+          {
+            option: String,
+            text: String,
+          },
+        ],
+        explanation: String,
         answer: String,
       },
     ],

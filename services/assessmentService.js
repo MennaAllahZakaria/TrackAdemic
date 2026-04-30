@@ -64,6 +64,7 @@ exports.startAssessment = asyncHandler(async (req, res) => {
     user: userId,
     sessionId: aiData.session_id,
     currentQuestion: aiData.question_number,
+    answers: [],
     totalQuestions: aiData.total_questions,
   });
 
@@ -72,6 +73,8 @@ exports.startAssessment = asyncHandler(async (req, res) => {
   userContext.stage = "assessment";
   userContext.lastActivity = new Date();
   await userContext.save();
+  aiData.question.explanation = undefined;
+  aiData.question.expected_behavior = undefined;
 
   res.status(200).json({
     status: "success",
@@ -120,6 +123,7 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
     );
 
     aiData = response.data;
+    console.log("AI RESPONSE:", aiData);
   } catch (err) {
     const aiError = err.response?.data;
 
@@ -130,14 +134,6 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
         ai_error: aiError || null,
       });
   }
-
-  /* ================= SAVE ANSWER ================= */
-
-  session.answers.push({
-    questionId: session.currentQuestion,
-    answer,
-  });
-
   /* ================= END ASSESSMENT ================= */
 
   if (!aiData.question) {
@@ -158,7 +154,7 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
 
     const userContext = await UserContext.findOne({ user: userId });
 
-    if (userContext) {
+    if (userContext && updatedContext!==null) {
       userContext.level = updatedContext.level;
       userContext.strongTopics = updatedContext.strong_topics || [];
       userContext.weakTopics = updatedContext.weak_topics || [];
@@ -198,6 +194,25 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
     });
   }
 
+  /* ================= SAVE ANSWER ================= */
+
+  const options = Object.entries(aiData.question.options).map(
+      ([key, value]) => ({
+        option: key,
+        text: value,
+      })
+    );
+
+  session.answers.push({
+    questionId: aiData.question_number,
+    questionText: aiData.question.question,
+    options: options,
+    explanation: aiData.question.explanation|| aiData.question.expected_behavior ||  "",
+    answer,
+  });
+   
+  const { explanation, expected_behavior, ...cleanQuestion } = aiData.question;
+
   /* ================= NEXT QUESTION ================= */
 
   session.currentQuestion = aiData.question_number;
@@ -205,8 +220,48 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     status: "success",
-    question: aiData.question,
+    question: cleanQuestion,
     questionNumber: aiData.question_number,
     totalQuestions: aiData.total_questions,
   });
 });
+
+exports.getActiveSession = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const session = await AssessmentSession.findOne({
+    user: userId,
+    isCompleted: false,
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      message: "No active assessment session found",
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: session,
+  });
+});
+
+exports.getAssessmentsResult = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const sessions = await AssessmentSession.find({
+    user: userId,
+    isCompleted: true,
+  });
+
+  if (!sessions.length) {
+    return res.status(404).json({
+      message: "No completed assessment session found",
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: sessions.map((session) => session.result),
+  });
+}); 
