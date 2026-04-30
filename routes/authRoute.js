@@ -10,7 +10,7 @@ const {
     updateFcmToken,
     changePassword,
     getLoggedInUser,
-    //updateImageProfile,
+    updateImageProfile,
     googleLogin
 } = require("../services/authService");
 
@@ -25,6 +25,8 @@ const {
 } = require("../utils/validators/authValidator");
 
 const { protect, allowedTo } = require("../middleware/authMiddleware");
+
+const { uploadImageAndFile, attachUploadedLinks } = require("../middleware/uploadFileMiddleware");
 
 
 const router = express.Router();
@@ -64,7 +66,7 @@ router.put("/changePassword",protect, changePasswordValidator, changePassword);
 router.get("/me",protect,getLoggedInUser);
 
 //================== UPDATE IMAGE PROFILE ===================
-//router.patch("/updateImageProfile", protect, uploadImages, attachUploadedLinks, updateImageProfile);
+router.patch("/updateImageProfile", protect, uploadImageAndFile, attachUploadedLinks, updateImageProfile);
 
 //================== GOOGLE LOGIN ===================
 router.post("/google-login", googleLogin);

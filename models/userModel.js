@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
 
     imageProfile: {
         type: String,
-        default: null,
+        default: "https://res.cloudinary.com/dhlgpqcrb/image/upload/v1777564315/images_txkken.png",
     },
     fcmToken: {
         type: String,

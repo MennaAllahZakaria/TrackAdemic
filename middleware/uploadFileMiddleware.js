@@ -13,9 +13,6 @@ const storage = new CloudinaryStorage({
     if (file.fieldname === "imageProfile") {
       folder = "profile_images";
       resource_type = "image";
-    } else if (file.fieldname === "certificate") {
-      folder = "certificates";
-      resource_type = "raw";
     }
 
     return {
@@ -36,13 +33,6 @@ const fileFilter = (req, file, cb) => {
     return cb(new ApiError("Only images allowed for imageProfile", 400), false);
   }
 
-  if (
-    file.fieldname === "certificate" &&
-    file.mimetype !== "application/pdf"
-  ) {
-    return cb(new ApiError("Only PDF allowed for certificate", 400), false);
-  }
-
   cb(null, true);
 };
 
@@ -56,7 +46,6 @@ const upload = multer({
 // ميدل وير لرفع صورة وملف معًا
 exports.uploadImageAndFile = upload.fields([
   { name: "imageProfile", maxCount: 1 },
-  { name: "certificate", maxCount: 1 },
 ]);
 
 // ميدل وير لإضافة اللينكات في req
@@ -64,9 +53,6 @@ exports.attachUploadedLinks = (req, res, next) => {
   try {
     if (req.files?.imageProfile?.[0]) {
       req.imageProfileUrl = req.files.imageProfile[0].path;
-    }
-    if (req.files?.certificate?.[0]) {
-      req.certificateUrl = req.files.certificate[0].path;
     }
 
 
