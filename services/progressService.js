@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Progress = require("../models/progressModel");
 const LearningPath = require("../models/learningPathModel");
 const UserContext = require("../models/userContextModel");
+const { sendReminder } = require("../cornJobs/dailyReminder");
 
 /* ================= HELPERS ================= */
 
@@ -60,6 +61,7 @@ exports.updateProgress = asyncHandler(async (req, res) => {
     progress.totalHoursStudied += hours;
     progress.hoursThisWeek += hours;
     progress.lastStudyDate = new Date();
+    sendReminder(req.user, "progress");
   }
 
   /* ================= UPDATE TOPIC ================= */
@@ -136,6 +138,7 @@ exports.updateProgress = asyncHandler(async (req, res) => {
       !userContext.completedPhases.includes(currentPhaseIndex)
     ) {
       userContext.completedPhases.push(currentPhaseIndex);
+      sendReminder(req.user, "milestone");
     }
 
     userContext.lastActivity = new Date();
