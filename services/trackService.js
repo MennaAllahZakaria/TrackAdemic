@@ -6,7 +6,7 @@ exports.createTrack = asyncHandler(async (req, res) => {
     const { title, description, totalHours, totalModules, category } = req.body;
 
       if (!req.files?.trackImage) {
-        return next(new ApiError("No image file uploaded", 400));
+        return (new ApiError("No image file uploaded", 400));
       }
 
     if (!title || !description) {
