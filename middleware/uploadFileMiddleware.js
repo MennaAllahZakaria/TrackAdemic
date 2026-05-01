@@ -14,6 +14,10 @@ const storage = new CloudinaryStorage({
       folder = "profile_images";
       resource_type = "image";
     }
+    if (file.fieldname === "trackImage") {
+      folder = "track_images";
+      resource_type = "image";
+    }
 
     return {
       folder,
@@ -46,6 +50,7 @@ const upload = multer({
 // ميدل وير لرفع صورة وملف معًا
 exports.uploadImageAndFile = upload.fields([
   { name: "imageProfile", maxCount: 1 },
+  { name: "trackImage", maxCount: 1 }
 ]);
 
 // ميدل وير لإضافة اللينكات في req
@@ -54,7 +59,9 @@ exports.attachUploadedLinks = (req, res, next) => {
     if (req.files?.imageProfile?.[0]) {
       req.imageProfileUrl = req.files.imageProfile[0].path;
     }
-
+    if (req.files?.trackImage?.[0]) {
+      req.trackImageUrl = req.files.trackImage[0].path;
+    }
 
     next();
   } catch (err) {
