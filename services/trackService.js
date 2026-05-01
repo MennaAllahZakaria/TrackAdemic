@@ -3,7 +3,7 @@ const Track = require("../models/trackModel");
 const ApiError = require("../utils/apiError");
 
 exports.createTrack = asyncHandler(async (req, res) => {
-    const { title, description, totalHours, totalModules } = req.body;
+    const { title, description, totalHours, totalModules, category } = req.body;
 
       if (!req.files?.trackImage) {
         return next(new ApiError("No image file uploaded", 400));
@@ -21,6 +21,7 @@ exports.createTrack = asyncHandler(async (req, res) => {
         trackImage : req.trackImageUrl,
         totalHours,
         totalModules,
+        category,
     });
 
     res.status(201).json({

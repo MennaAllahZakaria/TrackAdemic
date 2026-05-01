@@ -15,6 +15,9 @@ const trackSchema = new mongoose.Schema({
     trackImage: {
         type: String
     },
+    category: {
+        type: String,
+    },
     totalHours: {
         type: Number
     },
