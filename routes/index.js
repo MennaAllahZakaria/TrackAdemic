@@ -6,6 +6,8 @@ const quizRoute = require("./quizRoute");
 const assessmentRoute = require("./assessmentRoute");
 const userContextRoute = require("./userContextRoute");
 const trackRoute = require("./trackRoute");
+const notificationRoute = require("./notificationRoute");
+
 
 const mountRoutes = (app) => {
     app.use((req, res, next) => {
@@ -42,7 +44,7 @@ app.use("/quiz", quizRoute);
 app.use("/assessment", assessmentRoute);
 app.use("/user-context", userContextRoute);
 app.use("/tracks", trackRoute);
-
+app.use("/notifications", notificationRoute);
 //=============================
 // 404 Handler
 //=============================
