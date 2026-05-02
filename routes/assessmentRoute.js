@@ -10,8 +10,10 @@ const {
 
 const { protect , allowedTo} = require("../middleware/authMiddleware");
 
-router.post("/start", protect, allowedTo("user"), startAssessment);
-router.post("/answer", protect, allowedTo("user"), answerAssessment);
+const { updateStreak }= require("../services/authService")
+
+router.post("/start", protect, allowedTo("user"),updateStreak, startAssessment);
+router.post("/answer", protect, allowedTo("user"),updateStreak, answerAssessment);
 
 router.get("/active", protect, allowedTo("user"), getActiveSession);
 router.get("/result", protect, allowedTo("user"), getAssessmentsResult);

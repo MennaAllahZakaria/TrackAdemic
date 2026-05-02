@@ -12,8 +12,8 @@ const { protect , allowedTo} = require("../middleware/authMiddleware");
 const { uploadImageAndFile, attachUploadedLinks } = require("../middleware/uploadFileMiddleware");
 
 router.post("/", protect, allowedTo("admin"), uploadImageAndFile, attachUploadedLinks, createTrack);
-router.get("/", getAllTracks);
+router.get("/",protect , getAllTracks);
 router.get("/:id", getTrackById);
-router.put("/:id", updateTrack);
+router.put("/:id", allowedTo("admin"), updateTrack);
 
 module.exports = router;

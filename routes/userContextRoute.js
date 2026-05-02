@@ -7,8 +7,9 @@ const {
 } = require("../services/userContextService");
 
 const { protect , allowedTo} = require("../middleware/authMiddleware");
+const { updateStreak }= require("../services/authService")
 
-router.put("/", protect, upsertUserContext);
+router.put("/", protect,updateStreak, upsertUserContext);
 router.get("/", protect, getUserContext);
 
 module.exports = router;

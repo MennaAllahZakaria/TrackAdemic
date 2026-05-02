@@ -51,6 +51,11 @@ const userSchema = new mongoose.Schema({
         unique: true,
         sparse: true,
     },
+    streak: {
+        count: { type: Number, default: 0 },
+        lastActiveDate: Date,
+        longest: { type: Number, default: 0 }
+    }
 
 },{
     timestamps: true,

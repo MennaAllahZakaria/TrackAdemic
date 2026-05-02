@@ -8,8 +8,10 @@ const {
 
 const { protect , allowedTo} = require("../middleware/authMiddleware");
 
-router.post("/generate", protect,allowedTo("user"), generateLearningPath);
+const { updateStreak }= require("../services/authService")
+
+router.post("/generate", protect,allowedTo("user"),updateStreak, generateLearningPath);
 router.get("/me", protect,allowedTo("user"), getMyLearningPath);
-router.post("/regenerate", protect, allowedTo("user"), regenerateLearningPath);
+router.post("/regenerate", protect, allowedTo("user"),updateStreak, regenerateLearningPath);
 
 module.exports = router;

@@ -544,3 +544,101 @@ exports.updateImageProfile = asyncHandler(async (req, res, next) => {
     data: { imageProfile: user.imageProfile },
   });
 });
+
+exports.updateStreak = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const user = await User.findById(
+    userId,
+    { "streak.lastActiveDate": 1 }
+  );
+
+  if (!user) return next();
+
+  /* ================= NORMALIZE ================= */
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let lastDate = user.streak?.lastActiveDate
+    ? new Date(user.streak.lastActiveDate)
+    : null;
+
+  if (lastDate) {
+    lastDate.setHours(0, 0, 0, 0);
+  }
+
+  /* ================= FIRST TIME ================= */
+
+  if (!lastDate) {
+    await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          "streak.count": 1,
+          "streak.lastActiveDate": today,
+          "streak.longest": 1,
+        },
+      }
+    );
+
+    return next();
+  }
+
+  /* ================= DIFF ================= */
+
+  const diffDays =
+    (today - lastDate) / (1000 * 60 * 60 * 24);
+
+  /* ================= SAME DAY ================= */
+
+  if (diffDays === 0) {
+    return next();
+  }
+
+  /* ================= NEXT DAY (RACE SAFE) ================= */
+
+  if (diffDays === 1) {
+    const updated = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        "streak.lastActiveDate": lastDate, // 👈 يمنع race condition
+      },
+      {
+        $inc: { "streak.count": 1 },
+        $set: { "streak.lastActiveDate": today },
+      },
+      { new: true }
+    );
+
+    // تحديث longest لو فعلاً حصل increment
+    if (updated) {
+      if (updated.streak.count > (updated.streak.longest || 0)) {
+        await User.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              "streak.longest": updated.streak.count,
+            },
+          }
+        );
+      }
+    }
+
+    return next();
+  }
+
+  /* ================= RESET ================= */
+
+  await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        "streak.count": 1,
+        "streak.lastActiveDate": today,
+      },
+    }
+  );
+
+  return next();
+});
