@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const Track = require("../models/trackModel");
 const ApiError = require("../utils/apiError");
+const HandlerFactory = require("./handlerFactory")
 
 exports.createTrack = asyncHandler(async (req, res) => {
     const { title, description, totalHours, totalModules, category , level} = req.body;
@@ -92,3 +93,5 @@ exports.getTrackById = asyncHandler(async (req, res) => {
         data: track,
     });
 });
+
+exports.updateTrack = HandlerFactory.updateOne(Track);
