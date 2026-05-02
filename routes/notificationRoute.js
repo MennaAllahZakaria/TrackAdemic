@@ -21,6 +21,8 @@ const router = express.Router();
 
 router.post('/',protect,allowedTo("admin"),addNotification);
 
+router.get("/start-daily-reminder", startDailyReminderService);
+
 router
   .route("/all")
   .get(protect, getNotifications)
@@ -33,6 +35,5 @@ router
 
 router.put("/read/:id", protect, markNotificationAsRead);
 
-router.get("/start-daily-reminder", startDailyReminderService);
 
 module.exports = router;

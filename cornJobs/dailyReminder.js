@@ -60,7 +60,7 @@ async function sendReminder(user, type) {
 /* =========================================
    DAILY REMINDER CRON
 ========================================= */
-exports.startDailyReminderService = async() => {
+exports.startDailyReminderService = async(req, res) => {
     // runs every day at midnight
     try {
       const users = await User.find({ role: "user" });
@@ -70,5 +70,10 @@ exports.startDailyReminderService = async() => {
     } catch (err) {
       console.error("Cron error:", err);
     }
+
+    res.status(200).json({
+        status: "success",
+        message: "Daily reminder service started",
+    });
 };
 
