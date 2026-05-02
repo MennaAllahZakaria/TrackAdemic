@@ -24,6 +24,10 @@ const trackSchema = new mongoose.Schema({
     totalModules: {
         type: Number
     },
+    level:{
+        type: String,
+        enum: ["Beginner", "Intermediate", "Advanced"],
+    }
 
 
 },{timestamps: true});
