@@ -5,7 +5,8 @@ const {
     startAssessment,
     answerAssessment,
     getActiveSession,
-    getAssessmentsResult
+    getAssessmentsResult,
+    getAssessmentBySessionId
 } = require("../services/assessmentService");
 
 const { protect , allowedTo} = require("../middleware/authMiddleware");
@@ -17,5 +18,7 @@ router.post("/answer", protect, allowedTo("user"),updateStreak, answerAssessment
 
 router.get("/active", protect, allowedTo("user"), getActiveSession);
 router.get("/result", protect, allowedTo("user"), getAssessmentsResult);
+
+router.get("/:sessionId" , protect , allowedTo("user") ,getAssessmentBySessionId );
 
 module.exports = router;

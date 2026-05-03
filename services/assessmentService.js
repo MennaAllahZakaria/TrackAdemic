@@ -272,16 +272,41 @@ exports.getAssessmentsResult = asyncHandler(async (req, res) => {
   const sessions = await AssessmentSession.find({
     user: userId,
     isCompleted: true,
-  });
+  })
+    .select("sessionId result createdAt totalQuestions")
+    .sort({ createdAt: -1 });
 
   if (!sessions.length) {
     return res.status(404).json({
       message: "No completed assessment session found",
     });
+  } 
+
+  res.status(200).json({
+    status: "success",
+    count: sessions.length,
+    data: sessions,
+  });
+}); 
+
+
+exports.getAssessmentBySessionId = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { sessionId } = req.params;
+
+  const session = await AssessmentSession.findOne({
+    user: userId,
+    sessionId,
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      message: "Assessment not found",
+    });
   }
 
   res.status(200).json({
     status: "success",
-    data: sessions.map((session) => session.result),
+    data: session,
   });
-}); 
+});
