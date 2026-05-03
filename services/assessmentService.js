@@ -59,12 +59,25 @@ exports.startAssessment = asyncHandler(async (req, res) => {
   }
 
   /* ================= SAVE SESSION ================= */
+  
+  const options = Object.entries(aiData.question.options).map(
+      ([key, value]) => ({
+        option: key,
+        text: value,
+      })
+    );
 
   const session = await AssessmentSession.create({
     user: userId,
     sessionId: aiData.session_id,
     currentQuestion: aiData.question_number,
-    answers: [],
+    answers: [{
+        questionId: aiData.question_number,
+        questionText: aiData.question.question,
+        options: options,
+        explanation: aiData.question.explanation|| aiData.question.expected_behavior ||  "",
+
+    }],
     totalQuestions: aiData.total_questions,
   });
 
@@ -196,19 +209,26 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
 
   /* ================= SAVE ANSWER ================= */
 
-  const options = Object.entries(aiData.question.options).map(
-      ([key, value]) => ({
-        option: key,
-        text: value,
-      })
-    );
+  if (session.answers.length > 0) {
+    session.answers[session.answers.length - 1].answer = answer;
+  }
+
+  if (aiData.question.options){
+    const options = Object.entries(aiData.question.options).map(
+        ([key, value]) => ({
+          option: key,
+          text: value,
+        })
+      );
+
+  }
 
   session.answers.push({
     questionId: aiData.question_number,
     questionText: aiData.question.question,
-    options: options,
+    options: options?options:"",
     explanation: aiData.question.explanation|| aiData.question.expected_behavior ||  "",
-    answer,
+    answer: null
   });
    
   const { explanation, expected_behavior, ...cleanQuestion } = aiData.question;
