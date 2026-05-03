@@ -7,7 +7,6 @@ const UserContext = require("../models/userContextModel");
 
 exports.startAssessment = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { field, goal } = req.body;
 
   /* ================= GET USER CONTEXT ================= */
 
@@ -40,8 +39,8 @@ exports.startAssessment = asyncHandler(async (req, res) => {
     const response = await axios.post(
       process.env.AI_BASE_URL + "/assessment/start",
       {
-        field: field || userContext.field,
-        goal: goal || userContext.goal,
+        field: userContext.field,
+        goal: userContext.goal,
         user_context: userContext.toObject(),
       },
     );
