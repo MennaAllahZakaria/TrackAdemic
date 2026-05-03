@@ -209,12 +209,13 @@ exports.answerAssessment = asyncHandler(async (req, res) => {
 
   /* ================= SAVE ANSWER ================= */
 
+  let options;
   if (session.answers.length > 0) {
     session.answers[session.answers.length - 1].answer = answer;
   }
 
   if (aiData.question.options){
-    const options = Object.entries(aiData.question.options).map(
+    options = Object.entries(aiData.question.options).map(
         ([key, value]) => ({
           option: key,
           text: value,
