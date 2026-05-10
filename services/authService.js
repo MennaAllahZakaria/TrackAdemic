@@ -478,53 +478,64 @@ exports.googleLogin = asyncHandler(async (req, res) => {
     });
   }
 
-  /* ================= VERIFY TOKEN ================= */
+    try {
 
-  const ticket = await client.verifyIdToken({
-    idToken: token,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
+      // VERIFY
+      const ticket = await client.verifyIdToken({
+          idToken: token,
+          audience:process.env.GOOGLE_CLIENT_ID,
+        });
 
-  const payload = ticket.getPayload();
+      const payload =  ticket.getPayload();
 
-  const {
-    sub: googleId,
-    email,
-    given_name,
-    family_name,
-    picture,
-  } = payload;
+      const {
+        sub: googleId,
+        email,
+        given_name,
+        family_name,
+        picture,
+      } = payload;
 
+      // FIND USER
+      let user = await User.findOne({ email });
 
-  /* ================= FIND OR CREATE USER ================= */
+      // LINK EXISTING ACCOUNT
+      if (user && !user.googleId) {
+        user = await User.findByIdAndUpdate(
+            user._id,
+            { googleId,},
+            { new: true }
+          );
+      }
+      // CREATE USER
+      if (!user) {
+        user = await User.create({
+            firstName:given_name || "Google",
+            lastName:family_name || "User",
+            email,
+            googleId,
+            imageProfile: picture,
+            isVerified: true,
+          });
+      }
 
-  let user = await User.findOne({ email });
+      // JWT
+      const userToken = createToken(user._id);
 
-  if (user && !user.googleId) {
-      user.googleId = googleId;
-      await user.save();
+      res.status(200).json({
+        status: "success",
+        token: userToken,
+        user,
+      });
+
+    } catch (err) {
+
+      console.log(err);
+      res.status(500).json({
+        message:err.message,
+      });
     }
-
-  if (!user) {
-    user = await User.create({
-      firstName: given_name,
-      lastName: family_name,
-      email,
-      googleId,
-      imageProfile: picture,
-    });
-  }
-
-  /* ================= GENERATE JWT ================= */
-
-  const userToken = createToken(user._id);
-
-  res.status(200).json({
-    status: "success",
-    token: userToken,
-    user,
   });
-});
 
 exports.updateImageProfile = asyncHandler(async (req, res, next) => {
   if (!req.files?.imageProfile) {
