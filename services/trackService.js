@@ -32,53 +32,130 @@ exports.createTrack = asyncHandler(async (req, res) => {
     });
 });
 
-exports.getAllTracks = asyncHandler(async (req, res) => {
-  // 1️⃣ Filtering
-  let queryObj = { ...req.query };
+exports.getAllTracks = asyncHandler(async (req,res) => {
 
-  const excludedFields = ["page", "sort", "limit", "fields"];
-  excludedFields.forEach((el) => delete queryObj[el]);
+    // ================= FILTERING =================
 
-  // advanced filtering (gte, lte, etc)
-  let queryStr = JSON.stringify(queryObj);
-  queryStr = queryStr.replace(
-    /\b(gte|gt|lte|lt)\b/g,
-    (match) => `$${match}`
-  );
+    let queryObj = {
+      ...req.query,
+    };
 
-  let query = Track.find(JSON.parse(queryStr));
+    const excludedFields = [
+      "page",
+      "sort",
+      "limit",
+      "fields",
+    ];
 
-  // 2️⃣ Sorting
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(",").join(" ");
-    query = query.sort(sortBy);
-  } else {
-    query = query.sort("-createdAt");
-  }
+    excludedFields.forEach(
+      (el) =>
+        delete queryObj[el]
+    );
 
-  // 3️⃣ Field Limiting
-  if (req.query.fields) {
-    const fields = req.query.fields.split(",").join(" ");
-    query = query.select(fields);
-  } else {
-    query = query.select("-__v");
-  }
+    let queryStr =
+      JSON.stringify(queryObj);
 
-  // 4️⃣ Pagination
-  const page = req.query.page * 1 || 1;
-  const limit = req.query.limit * 1 || 10
-  const skip = (page - 1) * limit;
+    queryStr = queryStr.replace(
+      /\b(gte|gt|lte|lt)\b/g,
+      (match) => `$${match}`
+    );
 
-  query = query.skip(skip).limit(limit);
+    // ================= TOTAL =================
 
-  const tracks = await query;
+    const totalDocuments =
+      await Track.countDocuments(
+        JSON.parse(queryStr)
+      );
 
-  res.status(200).json({
-    status: "success",
-    results: tracks.length,
-    page,
-    data: tracks,
-  });
+    // ================= QUERY =================
+
+    let query = Track.find(
+      JSON.parse(queryStr)
+    );
+
+    // ================= SORT =================
+
+    if (req.query.sort) {
+
+      const sortBy =
+        req.query.sort
+          .split(",")
+          .join(" ");
+
+      query =
+        query.sort(sortBy);
+
+    } else {
+
+      query =
+        query.sort("-createdAt");
+
+    }
+
+    // ================= FIELDS =================
+
+    if (req.query.fields) {
+
+      const fields =
+        req.query.fields
+          .split(",")
+          .join(" ");
+
+      query = query.select(fields);
+
+    } else {
+
+      query = query.select("-__v");
+
+    }
+
+    // ================= PAGINATION =================
+
+    const page = req.query.page * 1 || 1;
+
+    const limit = req.query.limit * 1 || 10;
+
+    const skip = (page - 1) * limit;
+
+    query = query.skip(skip).limit(limit);
+
+    // ================= EXECUTE =================
+
+    const tracks = await query;
+
+    // ================= PAGINATION RESULT =================
+
+    const totalPages =
+      Math.ceil(
+        totalDocuments / limit
+      );
+
+    const pagination = {
+      currentPage: page,
+      limit,
+      totalPages,
+      totalDocuments,
+    };
+
+    if (page < totalPages) {
+      pagination.nextPage =
+        page + 1;
+    }
+
+    if (page > 1) {
+      pagination.prevPage =
+        page - 1;
+    }
+
+    // ================= RESPONSE =================
+
+    res.status(200).json({
+      status: "success",
+      results: tracks.length,
+      pagination,
+      data: tracks,
+    });
+
 });
 
 exports.getTrackById = asyncHandler(async (req, res) => {
