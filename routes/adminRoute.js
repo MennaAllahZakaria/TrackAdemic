@@ -25,6 +25,7 @@ const {
   getQuizAttemptById,
   deleteQuizAttempt,
   getQuizStats,
+  getQuizAnalytics
 } = require("../services/adminService");
 
 // All admin routes require authentication + admin role
@@ -58,6 +59,7 @@ router.delete("/contact/:id", deleteContactMessage);
 router.get   ("/quizzes",       getAllQuizAttempts);
 router.get   ("/quizzes/stats", getQuizStats);
 router.get   ("/quizzes/:id",   getQuizAttemptById);
+router.get   ("/quizzes/quiz-analytics", getQuizAnalytics);
 router.delete("/quizzes/:id",   deleteQuizAttempt);
 
 module.exports = router;

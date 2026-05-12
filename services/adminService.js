@@ -460,3 +460,255 @@ exports.getQuizStats = asyncHandler(async (req, res) => {
     },
   });
 });
+
+exports.getQuizAnalytics = asyncHandler(async (req, res) => {
+
+  const [
+    overview,
+    topTopics,
+    dailyAttempts,
+    avgScorePerTopic,
+    hardestTopics,
+    latestAttempts,
+  ] = await Promise.all([
+
+    // =========================
+    // OVERVIEW
+    // =========================
+    QuizAttempt.aggregate([
+      {
+        $group: {
+          _id: null,
+
+          totalAttempts: {
+            $sum: 1,
+          },
+
+          avgScore: {
+            $avg: "$percentage",
+          },
+
+          highestScore: {
+            $max: "$percentage",
+          },
+
+          lowestScore: {
+            $min: "$percentage",
+          },
+
+          passedCount: {
+            $sum: {
+              $cond: [
+                { $gte: ["$percentage", 50] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+
+    // =========================
+    // TOP TOPICS
+    // =========================
+    QuizAttempt.aggregate([
+      {
+        $group: {
+          _id: "$topic",
+
+          attempts: {
+            $sum: 1,
+          },
+
+          avgScore: {
+            $avg: "$percentage",
+          },
+        },
+      },
+
+      {
+        $sort: {
+          attempts: -1,
+        },
+      },
+
+      {
+        $limit: 5,
+      },
+
+      {
+        $project: {
+          _id: 0,
+          topic: "$_id",
+          attempts: 1,
+          avgScore: {
+            $round: ["$avgScore", 1],
+          },
+        },
+      },
+    ]),
+
+    // =========================
+    // ATTEMPTS PER DAY
+    // =========================
+    QuizAttempt.aggregate([
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt",
+            },
+          },
+
+          attempts: {
+            $sum: 1,
+          },
+        },
+      },
+
+      {
+        $sort: {
+          _id: 1,
+        },
+      },
+    ]),
+
+    // =========================
+    // AVG SCORE PER TOPIC
+    // =========================
+    QuizAttempt.aggregate([
+      {
+        $group: {
+          _id: "$topic",
+
+          avgScore: {
+            $avg: "$percentage",
+          },
+
+          totalAttempts: {
+            $sum: 1,
+          },
+        },
+      },
+
+      {
+        $sort: {
+          avgScore: -1,
+        },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          topic: "$_id",
+          avgScore: {
+            $round: ["$avgScore", 1],
+          },
+          totalAttempts: 1,
+        },
+      },
+    ]),
+
+    // =========================
+    // HARDEST TOPICS
+    // =========================
+    QuizAttempt.aggregate([
+      {
+        $group: {
+          _id: "$topic",
+
+          avgScore: {
+            $avg: "$percentage",
+          },
+
+          attempts: {
+            $sum: 1,
+          },
+        },
+      },
+
+      {
+        $match: {
+          attempts: {
+            $gte: 3,
+          },
+        },
+      },
+
+      {
+        $sort: {
+          avgScore: 1,
+        },
+      },
+
+      {
+        $limit: 5,
+      },
+
+      {
+        $project: {
+          _id: 0,
+          topic: "$_id",
+          avgScore: {
+            $round: ["$avgScore", 1],
+          },
+          attempts: 1,
+        },
+      },
+    ]),
+
+    // =========================
+    // LATEST ATTEMPTS
+    // =========================
+    QuizAttempt.find()
+      .populate("user", "firstName lastName email imageProfile")
+      .sort("-createdAt")
+      .limit(10)
+      .select("topic percentage score total createdAt user"),
+  ]);
+
+
+  const stats = overview[0] || {
+    totalAttempts: 0,
+    avgScore: 0,
+    highestScore: 0,
+    lowestScore: 0,
+    passedCount: 0,
+  };
+
+  res.status(200).json({
+    status: "success",
+
+    data: {
+
+      overview: {
+        totalAttempts: stats.totalAttempts,
+
+        avgScore: Math.round(stats.avgScore || 0),
+
+        highestScore: stats.highestScore,
+
+        lowestScore: stats.lowestScore,
+
+        successRate:
+          stats.totalAttempts > 0
+            ? Math.round(
+                (stats.passedCount / stats.totalAttempts) * 100
+              )
+            : 0,
+      },
+
+      topTopics,
+
+      dailyAttempts,
+
+      avgScorePerTopic,
+
+      hardestTopics,
+
+      latestAttempts,
+    },
+  });
+});
