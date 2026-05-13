@@ -12,22 +12,76 @@ const HandlerFactory = require("./handlerFactory");
 // @access  Private/user
 
 exports.getNotifications = asyncHandler(async (req, res, next) => {
-    let filter = {};
-    // admin: get all notification in system 
-    // user : get only his notification
-    if (req.user.role === 'user' ) {
-        filter.recipient = req.user.id;
-    }
-    const notifications = await Notification.find(filter)
-                                            .sort({ createdAt: -1 })
-                                            .populate("recipient", "firstName lastName email")
-                                            .populate("sendBy", "firstName lastName email");
 
-    if (!notifications) {
-        return next(new ApiError("No notifications found for this user", 404));
-    }
+  let filter = {};
 
-    res.status(200).json({ results:notifications.length, data: notifications });
+  // user => only his notifications
+  if (req.user.role === "user") {
+    filter.recipient = req.user.id;
+  }
+
+  // =========================
+  // TODAY DATE RANGE
+  // =========================
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+
+  const endToday = new Date();
+  endToday.setHours(23, 59, 59, 999);
+
+  // =========================
+  // GET DATA IN PARALLEL
+  // =========================
+  const [
+    notifications,
+    unreadCount,
+    todayCount,
+    totalCount,
+  ] = await Promise.all([
+
+    Notification.find(filter)
+      .sort({ createdAt: -1 })
+      .populate("recipient", "firstName lastName email")
+      .populate("sendBy", "firstName lastName email"),
+
+    // unread notifications
+    Notification.countDocuments({
+      ...filter,
+      isRead: false,
+    }),
+
+    // today's notifications
+    Notification.countDocuments({
+      ...filter,
+      createdAt: {
+        $gte: startToday,
+        $lte: endToday,
+      },
+    }),
+
+    // total notifications
+    Notification.countDocuments(filter),
+  ]);
+
+  if (!notifications.length) {
+    return next(
+      new ApiError("No notifications found", 404)
+    );
+  }
+
+  res.status(200).json({
+    status: "success",
+
+    results: notifications.length,
+
+    analytics: {
+      total: totalCount,
+      unread: unreadCount,
+      today: todayCount,
+    },
+
+    data: notifications,
+  });
 });
 // @desc    Get notification of logged user by id
 // @route   GET /notifications/:id
