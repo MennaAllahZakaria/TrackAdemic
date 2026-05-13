@@ -47,7 +47,7 @@ exports.getNotifications = asyncHandler(async (req, res, next) => {
     // unread notifications
     Notification.countDocuments({
       ...filter,
-      isRead: false,
+      read: false,
     }),
 
     // today's notifications
