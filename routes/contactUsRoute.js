@@ -5,6 +5,7 @@ const {
     createContactUs,
     getContactUs,
     getAllContactUs,
+    resolveContactMessage
 } = require("../services/contactUsService");
 const {
     addContactUsValidator,
@@ -29,6 +30,14 @@ router
         allowedTo( "admin"),
         idValidator,
         getContactUs
+    );
+router
+    .route("/:id/resolve")
+    .put( 
+        protect,
+        allowedTo( "admin"),
+        idValidator,
+        resolveContactMessage
     );
 
 module.exports = router;
