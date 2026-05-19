@@ -8,7 +8,157 @@ exports.createContactUs = handlerFactory.createOne(ContactUs);
 
 exports.getContactUs = handlerFactory.getOne(ContactUs);
 
-exports.getAllContactUs = handlerFactory.getAll(ContactUs);
+exports.getAllContactUs = asyncHandler(async (req, res) => {
+
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      keyword,
+      sort = "-createdAt",
+    } = req.query;
+
+    // =========================
+    // FILTER
+    // =========================
+    const filter = {};
+
+    // filter by status
+    if (status) {
+      filter.status = status;
+    }
+
+    // search
+    if (keyword) {
+
+      filter.$or = [
+
+        {
+          firstName: {
+            $regex: keyword,
+            $options: "i",
+          },
+        },
+
+        {
+          lastName: {
+            $regex: keyword,
+            $options: "i",
+          },
+        },
+
+        {
+          email: {
+            $regex: keyword,
+            $options: "i",
+          },
+        },
+
+        {
+          subject: {
+            $regex: keyword,
+            $options: "i",
+          },
+        },
+
+        {
+          message: {
+            $regex: keyword,
+            $options: "i",
+          },
+        },
+
+      ];
+    }
+
+    // =========================
+    // PAGINATION
+    // =========================
+    const skip =
+      (page - 1) * limit;
+
+    // =========================
+    // GET DATA
+    // =========================
+    const [
+      contacts,
+      totalContacts,
+      resolvedCount,
+      pendingCount,
+    ] = await Promise.all([
+
+      ContactUs.find(filter)
+        .sort(
+          sort
+            .split(",")
+            .join(" ")
+        )
+        .skip(skip)
+        .limit(Number(limit))
+        .populate(
+          "resolvedBy",
+          "firstName lastName email"
+        ),
+
+      ContactUs.countDocuments(
+        filter
+      ),
+
+      ContactUs.countDocuments({
+        status: "resolved",
+      }),
+
+      ContactUs.countDocuments({
+        status: "pending",
+      }),
+
+    ]);
+
+    // =========================
+    // RESPONSE
+    // =========================
+    res.status(200).json({
+
+      status: "success",
+
+      results:
+        contacts.length,
+
+      pagination: {
+
+        currentPage:
+          Number(page),
+
+        limit:
+          Number(limit),
+
+        totalPages:
+          Math.ceil(
+            totalContacts / limit
+          ),
+
+        totalItems:
+          totalContacts,
+
+      },
+
+      analytics: {
+
+        total:
+          totalContacts,
+
+        resolved:
+          resolvedCount,
+
+        pending:
+          pendingCount,
+
+      },
+
+      data: contacts,
+
+    });
+});
 
 exports.resolveContactMessage = asyncHandler(async (req, res, next) => {
 
