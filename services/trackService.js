@@ -3,6 +3,9 @@ const Track = require("../models/trackModel");
 const ApiError = require("../utils/apiError");
 const HandlerFactory = require("./handlerFactory")
 
+const LearningPath = require("../models/learningPathModel");
+const User = require("../models/userModel");
+
 exports.createTrack = asyncHandler(async (req, res) => {
     const { title, description, totalHours, totalModules, category , level} = req.body;
 
@@ -32,7 +35,8 @@ exports.createTrack = asyncHandler(async (req, res) => {
     });
 });
 
-exports.getAllTracks = asyncHandler(async (req,res) => {
+exports.getAllTracks = asyncHandler(
+  async (req, res) => {
 
     // ================= FILTERING =================
 
@@ -60,17 +64,13 @@ exports.getAllTracks = asyncHandler(async (req,res) => {
       (match) => `$${match}`
     );
 
-    // ================= TOTAL =================
-
-    const totalDocuments =
-      await Track.countDocuments(
-        JSON.parse(queryStr)
-      );
+    const mongoFilter =
+      JSON.parse(queryStr);
 
     // ================= QUERY =================
 
     let query = Track.find(
-      JSON.parse(queryStr)
+      mongoFilter
     );
 
     // ================= SORT =================
@@ -101,27 +101,55 @@ exports.getAllTracks = asyncHandler(async (req,res) => {
           .split(",")
           .join(" ");
 
-      query = query.select(fields);
+      query =
+        query.select(fields);
 
     } else {
 
-      query = query.select("-__v");
+      query =
+        query.select("-__v");
 
     }
 
     // ================= PAGINATION =================
 
-    const page = req.query.page * 1 || 1;
+    const page =
+      req.query.page * 1 || 1;
 
-    const limit = req.query.limit * 1 || 10;
+    const limit =
+      req.query.limit * 1 || 10;
 
-    const skip = (page - 1) * limit;
+    const skip =
+      (page - 1) * limit;
 
-    query = query.skip(skip).limit(limit);
+    query =
+      query.skip(skip).limit(limit);
 
     // ================= EXECUTE =================
 
-    const tracks = await query;
+    const [
+      tracks,
+      totalDocuments,
+      totalTracks,
+      totalLearningPaths,
+      totalStudents,
+    ] = await Promise.all([
+
+      query,
+
+      Track.countDocuments(
+        mongoFilter
+      ),
+
+      Track.countDocuments(),
+
+      LearningPath.countDocuments(),
+
+      User.countDocuments({
+        role: "user",
+      }),
+
+    ]);
 
     // ================= PAGINATION RESULT =================
 
@@ -131,29 +159,48 @@ exports.getAllTracks = asyncHandler(async (req,res) => {
       );
 
     const pagination = {
+
       currentPage: page,
+
       limit,
+
       totalPages,
+
       totalDocuments,
+
+      ...(page < totalPages && {
+        nextPage: page + 1,
+      }),
+
+      ...(page > 1 && {
+        prevPage: page - 1,
+      }),
+
     };
-
-    if (page < totalPages) {
-      pagination.nextPage =
-        page + 1;
-    }
-
-    if (page > 1) {
-      pagination.prevPage =
-        page - 1;
-    }
 
     // ================= RESPONSE =================
 
     res.status(200).json({
+
       status: "success",
-      results: tracks.length,
+
+      results:
+        tracks.length,
+
+      analytics: {
+
+        totalTracks,
+
+        totalLearningPaths,
+
+        totalStudents,
+
+      },
+
       pagination,
+
       data: tracks,
+
     });
 
 });
