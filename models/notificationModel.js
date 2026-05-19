@@ -9,6 +9,21 @@ const notificationSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    type: {
+        type: String,
+
+        enum: [
+        "GENERAL",
+        "ANNOUNCEMENT",
+        "SYSTEM_ALERT",
+        "DAILY_REMINDER",
+        "MILESTONE",
+        "STREAK",
+        "PROGRESS",
+        ],
+
+        default: "GENERAL",
+    },
     recipient: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

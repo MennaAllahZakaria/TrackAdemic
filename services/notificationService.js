@@ -91,11 +91,26 @@ exports.getNotificationById = asyncHandler(async (req, res, next) => {
     const notification = await Notification.findById(req.params.id)
                                             .populate("recipient", "firstName lastName email")
                                             .populate("sendBy", "firstName lastName email");
+    
+    if (!notification) {
+      return next(
+        new ApiError(
+          "No notification found with this ID",
+          404
+        )
+      );
+    }
 
-    if (req.user.role==="user" ) {
-        if (req.user.id.toString() !== notification.recipient.toString()) {
-            return next(new ApiError("You are not the recipient of this notification", 401));
-        }
+    if (
+      req.user.role === "user" &&
+      req.user.id.toString() !== notification.recipient._id.toString()
+    ) {
+      return next(
+        new ApiError(
+          "You are not authorized to access this notification",
+          403
+        )
+      );
     }
 
     if (!notification) {
@@ -110,14 +125,40 @@ exports.getNotificationById = asyncHandler(async (req, res, next) => {
 // @access  Private/user
 
 exports.markNotificationAsRead = asyncHandler(async (req, res, next) => {
-    const notification = await Notification.findByIdAndUpdate(req.params.id, { read: true }, { new: true });
+
+  const notification = await Notification.findById(req.params.id);
 
     if (!notification) {
-        return next(new ApiError("No notification found with this ID", 404));
+      return next(
+        new ApiError(
+          "No notification found with this ID",
+          404
+        )
+      );
     }
 
-    res.status(200).json({ data: notification });
-});
+    if (
+      req.user.role === "user" &&
+      notification.recipient.toString() !== req.user.id
+    ) {
+      return next(
+        new ApiError(
+          "Not authorized",
+          403
+        )
+      );
+    }
+
+    notification.read = true;
+
+    await notification.save();
+
+    res.status(200).json({
+      status: "success",
+      data: notification,
+    });
+  }
+);
 
 // @desc    Delete notification
 // @route   DELETE /notifications/:id
@@ -140,25 +181,102 @@ exports.deleteAllNotifications = asyncHandler(async (req, res, next) => {
 // @route   POST /notifications
 // @access  Private/admin
 
-exports.addNotification=asyncHandler(async(req,res,next)=>{
-    const { title, message, userEmail } = req.body;
-    
-    const recipientId = await User.findOne({ email: userEmail });
-    const adminId = req.user._id; 
+exports.addNotification = asyncHandler(
+  async (req, res, next) => {
 
-    if (!title || !message || !recipientId) {
-        return res.status(400).json({ message: 'All fields are required' });
+    let {
+      title,
+      message,
+      type = "GENERAL",
+      userEmail,
+      sendToAll = false,
+    } = req.body;
+
+    // =========================
+    // VALIDATION
+    // =========================
+    if (!title || !message) {
+      return next(
+        new ApiError(
+          "Title and message are required",
+          400
+        )
+      );
     }
 
-    const notification = await Notification.create({
-        title,
-        message,
-        recipient: recipientId._id,
-        sendBy: adminId,
+    // if no email => send to all
+    if (!userEmail) {
+      sendToAll = true;
+    }
+
+    // =========================
+    // SEND TO ALL USERS
+    // =========================
+    if (sendToAll) {
+
+      const users = await User.find({
+        role: "user",
+      }).select("_id");
+
+      if (!users.length) {
+        return next(
+          new ApiError(
+            "No users found",
+            404
+          )
+        );
+      }
+
+      const notifications = users.map(
+        (user) => ({
+          title,
+          message,
+          type,
+          recipient: user._id,
+          sendBy: req.user._id,
+        })
+      );
+
+      await Notification.insertMany(
+        notifications
+      );
+
+      return res.status(201).json({
+        status: "success",
+        message:
+          "Notification sent to all users",
+        totalUsers: users.length,
+      });
+    }
+
+    // =========================
+    // SEND TO SINGLE USER
+    // =========================
+    const recipient = await User.findOne({
+      email: userEmail,
     });
 
+    if (!recipient) {
+      return next(
+        new ApiError(
+          "User not found",
+          404
+        )
+      );
+    }
+
+    const notification =
+      await Notification.create({
+        title,
+        message,
+        type,
+        recipient: recipient._id,
+        sendBy: req.user._id,
+      });
+
     res.status(201).json({
-        status: 'success',
-        data: notification,
+      status: "success",
+      data: notification,
     });
-})
+  }
+);
