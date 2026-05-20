@@ -12,7 +12,7 @@ const Notification     = require("../models/notificationModel");
 const ApiError         = require("../utils/apiError");
 const sendEmail        = require("../utils/sendEmail");
 const bcrypt           = require("bcryptjs");
-const generatePassword = require("../utils/generatePassword");
+const {generatePassword} = require("../utils/generatePassword");
 
 // ============================================================
 //  HELPER — build pagination meta
