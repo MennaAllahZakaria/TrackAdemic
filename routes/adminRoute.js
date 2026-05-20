@@ -14,6 +14,7 @@ const {
   updateUserRole,
   deleteUser,
   getUserProfile,
+  createUserByAdmin,
 
   // Contact Us
   getAllContactMessages,
@@ -45,7 +46,7 @@ router.get   ("/users/:id/profile",  getUserProfile);
 router.patch ("/users/:id/status",   updateUserStatus);
 router.patch ("/users/:id/role",     updateUserRole);
 router.delete("/users/:id",          deleteUser);
-
+router.post("/users",                createUserByAdmin);
 // ==============================
 //  CONTACT US
 // ==============================

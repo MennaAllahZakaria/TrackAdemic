@@ -10,6 +10,9 @@ const QuizAttempt      = require("../models/quizModel");
 const AssessmentSession = require("../models/assessmentSessionModel");
 const Notification     = require("../models/notificationModel");
 const ApiError         = require("../utils/apiError");
+const sendEmail        = require("../utils/sendEmail");
+const bcrypt           = require("bcryptjs");
+const generatePassword = require("../utils/generatePassword");
 
 // ============================================================
 //  HELPER — build pagination meta
@@ -273,6 +276,88 @@ exports.getUserProfile = asyncHandler(async (req, res, next) => {
   });
 });
 
+exports.createUserByAdmin = asyncHandler(async (req,res,next) => {
+    const {
+      firstName,
+      lastName,
+      email,
+      role = "user",
+    } = req.body;
+
+    // =========================
+    // VALIDATION
+    // =========================
+    if (!firstName || !lastName ||!email) {
+      return next(new ApiError("All fields are required",400));
+    }
+
+    // =========================
+    // CHECK EXISTING USER
+    // =========================
+    const existingUser =await User.findOne({email,});
+
+    if (existingUser) {
+      return next(new ApiError("User already exists",400));
+    }
+
+    // =========================
+    // GENERATE PASSWORD
+    // =========================
+    const generatedPassword =generatePassword();
+
+    // =========================
+    // HASH PASSWORD
+    // =========================
+    const hashedPassword = await bcrypt.hash(generatedPassword,12);
+
+    // =========================
+    // CREATE USER
+    // =========================
+    const user = await User.create({
+        firstName,
+        lastName,
+        email,
+        role,
+        password:hashedPassword,
+      });
+
+    // =========================
+    // SEND EMAIL
+    // =========================
+    try {
+
+      await sendEmail({
+        Email: email,
+        subject: "Your Trackademic Account",
+        message: ` Hello ${firstName},
+                    Your account has been created successfully.
+                    Login Credentials:
+                    Email:
+                    ${email}
+                    Password:
+                    ${generatedPassword}
+                    Please change your password after logging in.
+                    Trackademic Team`,
+  });
+
+    } catch (err) {
+
+      console.error(
+        "Email send error:",
+        err
+      );
+
+    }
+
+    // =========================
+    // RESPONSE
+    // =========================
+    res.status(201).json({
+      status: "success",
+      message:"User created successfully",
+    });
+
+});
 
 // ============================================================
 //  CONTACT US
