@@ -20,7 +20,7 @@ const sendReminder =
     let title = "";
     let body = "";
 
-    if (type === "daily") {
+    if (type === "DAILY_REMINDER") {
 
       title =
         "Daily Momentum Alert";
@@ -31,7 +31,7 @@ const sendReminder =
     }
 
     else if (
-      type === "milestone"
+      type === "MILESTONE"
     ) {
 
       title =
@@ -43,7 +43,7 @@ const sendReminder =
     }
 
     else if (
-      type === "streak"
+      type === "STREAK"
     ) {
 
       title =
@@ -55,7 +55,7 @@ const sendReminder =
     }
 
     else if (
-      type === "progress"
+      type === "PROGRESS"
     ) {
 
       title =
