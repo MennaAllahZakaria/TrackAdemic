@@ -155,7 +155,7 @@ const startDailyReminderService =
 
         await sendReminder(
           user,
-          "daily"
+          "DAILY_REMINDER"
         );
 
       }

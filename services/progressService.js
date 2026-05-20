@@ -61,7 +61,7 @@ exports.updateProgress = asyncHandler(async (req, res) => {
     progress.totalHoursStudied += hours;
     progress.hoursThisWeek += hours;
     progress.lastStudyDate = new Date();
-    await sendReminder(req.user, "progress");
+    await sendReminder(req.user, "PROGRESS");
   }
 
   /* ================= UPDATE TOPIC ================= */
@@ -138,7 +138,7 @@ exports.updateProgress = asyncHandler(async (req, res) => {
       !userContext.completedPhases.includes(currentPhaseIndex)
     ) {
       userContext.completedPhases.push(currentPhaseIndex);
-      await sendReminder(req.user, "milestone");
+      await sendReminder(req.user, "MILESTONE");
     }
 
     userContext.lastActivity = new Date();
