@@ -828,15 +828,11 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
     totalItems:
       totalAttemptsCount,
   };
+  pagination.next = page < totalPages ? page + 1 : null;
+  pagination.prev = page > 1 ? page - 1 : null;
 
-  if (page < totalPages) {
-    pagination.next = page + 1;
-  }
-
-  if (page > 1) {
-    pagination.prev = page - 1;
-  }
-
+  pagination.hasNext = page < totalPages;
+  pagination.hasPrev = page > 1;
   // =========================
   // RESPONSE
   // =========================
