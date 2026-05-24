@@ -546,8 +546,31 @@ exports.getQuizStats = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get quiz analytics for dashboard (attempts over time, top topics, hardest topics)
+
 exports.getQuizAnalytics = asyncHandler(async (req, res) => {
 
+  // =========================
+  // PAGINATION
+  // =========================
+  const page =
+    req.query.page * 1 || 1;
+
+  const limit =
+    req.query.limit * 1 || 10;
+
+  const skip =
+    (page - 1) * limit;
+
+  // =========================
+  // TOTAL ATTEMPTS
+  // =========================
+  const totalAttemptsCount =
+    await QuizAttempt.countDocuments();
+
+  // =========================
+  // PARALLEL
+  // =========================
   const [
     overview,
     topTopics,
@@ -557,9 +580,7 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
     latestAttempts,
   ] = await Promise.all([
 
-    // =========================
     // OVERVIEW
-    // =========================
     QuizAttempt.aggregate([
       {
         $group: {
@@ -584,7 +605,12 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
           passedCount: {
             $sum: {
               $cond: [
-                { $gte: ["$percentage", 50] },
+                {
+                  $gte: [
+                    "$percentage",
+                    50,
+                  ],
+                },
                 1,
                 0,
               ],
@@ -594,9 +620,7 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
       },
     ]),
 
-    // =========================
     // TOP TOPICS
-    // =========================
     QuizAttempt.aggregate([
       {
         $group: {
@@ -626,17 +650,20 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
         $project: {
           _id: 0,
           topic: "$_id",
+
           attempts: 1,
+
           avgScore: {
-            $round: ["$avgScore", 1],
+            $round: [
+              "$avgScore",
+              1,
+            ],
           },
         },
       },
     ]),
 
-    // =========================
-    // ATTEMPTS PER DAY
-    // =========================
+    // DAILY ATTEMPTS
     QuizAttempt.aggregate([
       {
         $group: {
@@ -660,9 +687,7 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
       },
     ]),
 
-    // =========================
     // AVG SCORE PER TOPIC
-    // =========================
     QuizAttempt.aggregate([
       {
         $group: {
@@ -687,18 +712,22 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
       {
         $project: {
           _id: 0,
+
           topic: "$_id",
+
           avgScore: {
-            $round: ["$avgScore", 1],
+            $round: [
+              "$avgScore",
+              1,
+            ],
           },
+
           totalAttempts: 1,
         },
       },
     ]),
 
-    // =========================
     // HARDEST TOPICS
-    // =========================
     QuizAttempt.aggregate([
       {
         $group: {
@@ -735,52 +764,112 @@ exports.getQuizAnalytics = asyncHandler(async (req, res) => {
       {
         $project: {
           _id: 0,
+
           topic: "$_id",
+
           avgScore: {
-            $round: ["$avgScore", 1],
+            $round: [
+              "$avgScore",
+              1,
+            ],
           },
+
           attempts: 1,
         },
       },
     ]),
 
-    // =========================
     // LATEST ATTEMPTS
-    // =========================
     QuizAttempt.find()
-      .populate("user", "firstName lastName email imageProfile")
+
+      .populate(
+        "user",
+        "firstName lastName email imageProfile"
+      )
+
       .sort("-createdAt")
-      .limit(10)
-      .select("topic percentage score total createdAt user"),
+
+      .skip(skip)
+
+      .limit(limit)
+
+      .select(
+        "topic percentage score total createdAt user"
+      ),
   ]);
 
+  // =========================
+  // STATS
+  // =========================
+  const stats =
+    overview[0] || {
+      totalAttempts: 0,
+      avgScore: 0,
+      highestScore: 0,
+      lowestScore: 0,
+      passedCount: 0,
+    };
 
-  const stats = overview[0] || {
-    totalAttempts: 0,
-    avgScore: 0,
-    highestScore: 0,
-    lowestScore: 0,
-    passedCount: 0,
+  // =========================
+  // PAGINATION RESULT
+  // =========================
+  const totalPages =
+    Math.ceil(
+      totalAttemptsCount / limit
+    );
+
+  const pagination = {
+    currentPage: page,
+
+    limit,
+
+    totalPages,
+
+    totalItems:
+      totalAttemptsCount,
   };
 
+  if (page < totalPages) {
+    pagination.next = page + 1;
+  }
+
+  if (page > 1) {
+    pagination.prev = page - 1;
+  }
+
+  // =========================
+  // RESPONSE
+  // =========================
   res.status(200).json({
     status: "success",
+
+    pagination,
 
     data: {
 
       overview: {
-        totalAttempts: stats.totalAttempts,
 
-        avgScore: Math.round(stats.avgScore || 0),
+        totalAttempts:
+          stats.totalAttempts,
 
-        highestScore: stats.highestScore,
+        avgScore:
+          Math.round(
+            stats.avgScore || 0
+          ),
 
-        lowestScore: stats.lowestScore,
+        highestScore:
+          stats.highestScore,
+
+        lowestScore:
+          stats.lowestScore,
 
         successRate:
           stats.totalAttempts > 0
             ? Math.round(
-                (stats.passedCount / stats.totalAttempts) * 100
+                (
+                  stats.passedCount /
+                  stats.totalAttempts
+                ) * 100
               )
             : 0,
       },
