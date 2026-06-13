@@ -486,7 +486,8 @@ exports.googleLogin = asyncHandler(async (req, res) => {
           audience:[
                     process.env.GOOGLE_CLIENT_ID, 
                     process.env.ANDROID_CLIENT_ID, 
-                    process.env.IOS_CLIENT_ID
+                    process.env.IOS_CLIENT_ID,
+                    process.env.ANDROID_CLIENT_ID_2,
                   ],
         });
 
