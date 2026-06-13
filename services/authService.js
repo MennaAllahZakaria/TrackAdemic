@@ -492,6 +492,7 @@ exports.googleLogin = asyncHandler(async (req, res) => {
         });
 
       const payload =  ticket.getPayload();
+      console.log("AUD:", payload.aud);
 
       const {
         sub: googleId,
@@ -535,7 +536,7 @@ exports.googleLogin = asyncHandler(async (req, res) => {
 
     } catch (err) {
 
-      console.log(err);
+      console.error("Google Login Error:", err);
       res.status(500).json({
         message:err.message,
       });
