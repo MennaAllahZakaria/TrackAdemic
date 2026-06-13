@@ -407,7 +407,7 @@ exports.changePassword = asyncHandler(async (req, res, next) => {
     const message = `
       Your password has been changed successfully.
       If you did not perform this action, please contact support immediately.
-      COSMETICS Team
+      TrackAdemic Team
       `;
   try {
     await sendEmail({
@@ -483,7 +483,11 @@ exports.googleLogin = asyncHandler(async (req, res) => {
       // VERIFY
       const ticket = await client.verifyIdToken({
           idToken: token,
-          audience:process.env.GOOGLE_CLIENT_ID,
+          audience:[
+                    process.env.GOOGLE_CLIENT_ID, 
+                    process.env.ANDROID_CLIENT_ID, 
+                    process.env.IOS_CLIENT_ID
+                  ],
         });
 
       const payload =  ticket.getPayload();
