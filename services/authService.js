@@ -467,7 +467,7 @@ exports.getLoggedInUser = asyncHandler(async (req, res) => {
   
 });
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client();
 
 exports.googleLogin = asyncHandler(async (req, res) => {
   const { token } = req.body;
